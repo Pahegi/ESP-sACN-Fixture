@@ -1,8 +1,13 @@
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
+#include <ESPAsyncE131.h>
+
+#define UNIVERSE 1                      // First DMX Universe to listen for
+#define UNIVERSE_COUNT 2                // Total number of Universes to listen for, starting at UNIVERSE
 
 WiFiServer server(80);
 String header;
+ESPAsyncE131 e131(UNIVERSE_COUNT);
 
 void setup() {
     WiFi.mode(WIFI_STA);
@@ -21,6 +26,11 @@ void setup() {
     }
     ArduinoOTA.begin();
     server.begin();
+
+    if (e131.begin(E131_MULTICAST, UNIVERSE, UNIVERSE_COUNT))   // Listen via Multicast
+        Serial.println(F("Listening for data..."));
+    else 
+        Serial.println(F("*** e131.begin failed ***"));
 }
 
 void loop() {
@@ -38,4 +48,15 @@ void loop() {
     }
     client.stop();
   }
+   if (!e131.isEmpty()) {
+        e131_packet_t packet;
+        e131.pull(&packet);     // Pull packet from ring buffer
+        
+        Serial.printf("Universe %u / %u Channels | Packet#: %u / Errors: %u / CH1: %u\n",
+                htons(packet.universe),                 // The Universe for this packet
+                htons(packet.property_value_count) - 1, // Start code is ignored, we're interested in dimmer data
+                e131.stats.num_packets,                 // Packet counter
+                e131.stats.packet_errors,               // Packet error counter
+                packet.property_values[1]);             // Dimmer data for Channel 1
+    }
 }
