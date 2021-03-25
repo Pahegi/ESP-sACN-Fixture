@@ -1,53 +1,65 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncE131.h>
+#include <ESPAsync_WiFiManager.h> //https://github.com/khoih-prog/ESPAsync_WiFiManager
+#include "SevenSeg.hpp"
 
+#define HTTP_PORT 80
+AsyncWebServer webServer(HTTP_PORT);
+DNSServer dnsServer;
+ESPAsync_WiFiManager ESPAsync_wifiManager(&webServer, &dnsServer, "ESP32-DMX sAcn Manager");
+String ssid = "ESP_" + String(ESP_getChipId(), HEX);
+const char *password = "123456789.";
 
-#define UNIVERSE 1                      // First DMX Universe to listen for
-#define UNIVERSE_COUNT 1                // Total number of Universes to listen for, starting at UNIVERSE
+#define UNIVERSE 1       // First DMX Universe to listen for
+#define UNIVERSE_COUNT 1 // Total number of Universes to listen for, starting at UNIVERSE
 
-const int ledPin = GPIO_NUM_12;
+const uint8_t ledPin = GPIO_NUM_12;
 const int freq = 5000;
-const int ledChannel = 0;
-const int resolution = 8;
+const uint8_t ledChannel = 0;
+const uint8_t resolution = 8;
 
-const char ssid[] = "1234";         // Replace with your SSID
-const char passphrase[] = "1234";   // Replace with your WPA2 passphrase
+typedef struct
+{
+    uint16_t start_channel = 0;
+    uint16_t channel_range = 1;
+} DMX_Config;
 
 ESPAsyncE131 e131(UNIVERSE_COUNT);
 
-void setup() {
+//custom seven segment library
+void setup()
+{
+    /********************************
+     * 
+     *          Pin Setup
+     * 
+     ********************************/
     Serial.begin(115200);
     ledcSetup(ledChannel, freq, resolution);
     ledcAttachPin(ledPin, ledChannel);
     delay(10);
 
-    // Make sure you're in station mode    
-    WiFi.mode(WIFI_STA);
+    /********************************
+     * 
+     *       Wifi Manager Setup
+     * 
+     ********************************/
 
-    Serial.println("");
-    Serial.print(F("Connecting to "));
-    Serial.print(ssid);
+    ESPAsync_wifiManager.setConfigPortalChannel(0);
+    ESPAsync_wifiManager.startConfigPortal("ESP32 DMX sAcn", password);
 
-    if (passphrase != NULL)
-        WiFi.begin(ssid, passphrase);
-    else
-        WiFi.begin(ssid);
+    /********************************
+     * 
+     *    Config for sAcn Library
+     * 
+     ********************************/
 
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-
-    Serial.println("");
-    Serial.print(F("Connected with IP: "));
-    Serial.println(WiFi.localIP());
-    
     // Choose one to begin listening for E1.31 data
     //if (e131.begin(E131_UNICAST))                               // Listen via Unicast
-    if (e131.begin(E131_MULTICAST, UNIVERSE, UNIVERSE_COUNT))   // Listen via Multicast
+    if (e131.begin(E131_MULTICAST, UNIVERSE, UNIVERSE_COUNT)) // Listen via Multicast
         Serial.println(F("Listening for data..."));
-    else 
+    else
         Serial.println(F("*** e131.begin failed ***"));
 }
 
@@ -63,13 +75,15 @@ void setup() {
 // };
 
 uint8_t packet_value;
-void loop() {
+void loop()
+{
     long start = micros();
     long start2 = micros();
-    while (!e131.isEmpty()) {
+    while (!e131.isEmpty())
+    {
         e131_packet_t packet;
-        e131.pull(&packet);     // Pull packet from ring buffer
-        
+        e131.pull(&packet); // Pull packet from ring buffer
+
         // Serial.printf("Universe %u / %u Channels | Packet#: %u / Errors: %u / CH1: %u\n",
         //         htons(packet.universe),                 // The Universe for this packet
         //         htons(packet.property_value_count) - 1, // Start code is ignored, we're interested in dimmer data
@@ -79,9 +93,9 @@ void loop() {
         //Serial.println(packet.property_values[1]);
         packet_value = packet.property_values[1];
     }
-    long diff = micros()-start;
+    long diff = micros() - start;
     Serial.println(diff);
-    delayMicroseconds(1600-diff);
+    delayMicroseconds(1600 - diff);
     ledcWrite(ledChannel, packet_value);
-    Serial.println(micros()-start2);
+    Serial.println(micros() - start2);
 }
