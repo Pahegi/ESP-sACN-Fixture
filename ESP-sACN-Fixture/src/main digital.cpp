@@ -12,6 +12,7 @@
 #include <ESPAsyncWiFiManager.h> //https://github.com/khoih-prog/ESPAsync_WiFiManager
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <Adafruit_NeoPixel.h>
 
 bool loadConfig();
 bool saveConfig();
@@ -38,11 +39,10 @@ DNSServer dnsServer;
 *           PIN Setup
 *
 ********************************/
-const uint8_t ledPinR = 15;
-const uint8_t ledPinG = 13;
-const uint8_t ledPinB = 12;
-const uint8_t ledPinW1 = 14;
-const uint8_t ledPinW2 = 4;
+// Neopixel
+#define NUM_PIXELS 170  /* Number of pixels */
+#define DATA_PIN 0      /* Pixel output - GPIO0 */
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUM_PIXELS, DATA_PIN, NEO_RGB + NEO_KHZ800);
 
 /********************************
 *
@@ -157,11 +157,8 @@ void setup() {
      ********************************/
     Serial.begin(115200);
     Serial.println();
-    pinMode(ledPinR, OUTPUT);
-    pinMode(ledPinG, OUTPUT);
-    pinMode(ledPinB, OUTPUT);
-    pinMode(ledPinW1, OUTPUT);
-    pinMode(ledPinW2, OUTPUT);
+    pixels.begin();
+    pixels.show();
     delay(1000);
 
     /********************************
@@ -275,18 +272,12 @@ void loop() {
     while (!e131.isEmpty()) {
         e131_packet_t packet;
         e131.pull(&packet); // Pull packet from ring buffer
-        analogWrite(ledPinR, packet.property_values[start_channel + 0]*4);
-        analogWrite(ledPinG, packet.property_values[start_channel + 1]*4);
-        analogWrite(ledPinB, packet.property_values[start_channel + 2]*4);
-        analogWrite(ledPinW1, packet.property_values[start_channel + 3]*4);
-        analogWrite(ledPinW2, packet.property_values[start_channel + 4]*4);
-        Serial.printf("R-%u G-%u B-%u W1-%u W2-%u \n",
-            packet.property_values[start_channel + 0]*4,
-            packet.property_values[start_channel + 1]*4,
-            packet.property_values[start_channel + 2]*4,
-            packet.property_values[start_channel + 3]*4,
-            packet.property_values[start_channel + 4]*4
-        );
+        for (int i = 0; i < NUM_PIXELS; i++) {
+            int j = i * 3 + (start_channel - 1);
+            pixels.setPixelColor(i, packet.property_values[start_channel + 0], packet.property_values[start_channel + 1], packet.property_values[start_channel + 2]);
+        }
+        pixels.show();
+        Serial.println("Received Packet");
     }
 
     //more timing
