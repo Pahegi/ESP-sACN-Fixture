@@ -193,7 +193,7 @@ void setup() {
      *
      ********************************/
     Serial.println("Starting WiFi Manager...");
-    AsyncWiFiManagerParameter custom_start_adress("DMX Startadresse", "DMX Startadresse", "", 3); //Crashing right here TODO
+    AsyncWiFiManagerParameter custom_start_adress("DMX Startadresse", "DMX Startadresse", "", 3);
     AsyncWiFiManagerParameter custom_start_universe("Universum", "Universum", "", 3);
     AsyncWiFiManager wifiManager(&webServer,&dnsServer);
     //set config save notify callback
@@ -265,8 +265,6 @@ void setup() {
 *
 ********************************/
 void loop() {
-    //Timing options
-    long start = micros();
 
     //OTA Handling
     ArduinoOTA.handle();
@@ -289,7 +287,4 @@ void loop() {
         );
     }
 
-    //more timing
-    long diff = micros() - start;
-    delayMicroseconds(1600 - diff);
 }
