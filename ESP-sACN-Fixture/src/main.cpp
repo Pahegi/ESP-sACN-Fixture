@@ -250,8 +250,8 @@ void setup() {
     // start_channel = 1;
     // start_universe = 1;
     // Choose one to begin listening for E1.31 data
-    if (e131.begin(E131_UNICAST))                               // Listen via Unicast
-    //if (e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT)) // Listen via Multicast
+    // if (e131.begin(E131_UNICAST))                               // Listen via Unicast
+    if (e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT)) // Listen via Multicast
         Serial.printf("Listening for E1.31 data on Universe %u starting at Channel %u...\n", start_universe, start_channel);
     else
         Serial.println(F("*** e131.begin failed ***"));
