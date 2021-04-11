@@ -8,7 +8,7 @@
 #endif
 
 #include <ArduinoOTA.h>
-#include <ESPAsyncE131.h>
+#include <E131.h>
 #include <ESPAsyncWiFiManager.h> //https://github.com/khoih-prog/ESPAsync_WiFiManager
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
@@ -54,7 +54,7 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUM_PIXELS, DATA_PIN, NEO_RGB + NEO
 uint8_t start_channel = 1;
 uint8_t start_universe = 1;
 
-ESPAsyncE131 e131(UNIVERSE_COUNT);
+E131 e131;
 
 /********************************
 *
@@ -95,6 +95,7 @@ bool loadConfig() {
     Serial.println(start_channel);
     Serial.print("Loaded start_universe: ");
     Serial.println(start_universe);
+
     return true;
 }
 
@@ -247,12 +248,8 @@ void setup() {
     // start_channel = 1;
     // start_universe = 1;
     // Choose one to begin listening for E1.31 data
-    if (e131.begin(E131_UNICAST))                               // Listen via Unicast
-    //if (e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT)) // Listen via Multicast
-        Serial.printf("Listening for E1.31 data on Universe %u starting at Channel %u...\n", start_universe, start_channel);
-    else
-        Serial.println(F("*** e131.begin failed ***"));
-
+    // if (e131.begin(E131_UNICAST))                               // Listen via Unicast
+    e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT); // Listen via Multicast
     Serial.println("Setup complete. Starting Loop...");
 }
 
@@ -262,25 +259,17 @@ void setup() {
 *
 ********************************/
 void loop() {
-    //Timing options
-    long start = micros();
-
     //OTA Handling
     ArduinoOTA.handle();
 
     //Incoming Packet Handling
-    while (!e131.isEmpty()) {
-        e131_packet_t packet;
-        e131.pull(&packet); // Pull packet from ring buffer
-        for (int i = 0; i < NUM_PIXELS; i++) {
-            int j = i * 3 + (start_channel - 1);
-            pixels.setPixelColor(i, packet.property_values[start_channel + 0], packet.property_values[start_channel + 1], packet.property_values[start_channel + 2]);
+    if(e131.parsePacket()) {
+        if (e131.universe == start_universe) {
+            for (int i = 0; i < NUM_PIXELS; i++) {
+                int j = i * 3 + (start_channel - 1);
+                pixels.setPixelColor(i, e131.data[j], e131.data[j+1], e131.data[j+2]);
+            }
+            pixels.show();
         }
-        pixels.show();
-        Serial.println("Received Packet");
     }
-
-    //more timing
-    long diff = micros() - start;
-    delayMicroseconds(1600 - diff);
 }
