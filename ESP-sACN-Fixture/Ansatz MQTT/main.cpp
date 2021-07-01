@@ -42,7 +42,7 @@ const uint8_t ledPinR = 15;
 const uint8_t ledPinG = 13;
 const uint8_t ledPinB = 12;
 const uint8_t ledPinW1 = 14;
-const uint8_t ledPinW2 = 4;
+const uint8_t ledPinW2 = 16;
 
 /********************************
 *
@@ -250,8 +250,8 @@ void setup() {
     // start_channel = 1;
     // start_universe = 1;
     // Choose one to begin listening for E1.31 data
-    // if (e131.begin(E131_UNICAST))                               // Listen via Unicast
-    if (e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT)) // Listen via Multicast
+    if (e131.begin(E131_UNICAST))                               // Listen via Unicast
+    // if (e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT)) // Listen via Multicast
         Serial.printf("Listening for E1.31 data on Universe %u starting at Channel %u...\n", start_universe, start_channel);
     else
         Serial.println(F("*** e131.begin failed ***"));
@@ -267,7 +267,7 @@ void setup() {
 void loop() {
 
     //OTA Handling
-    ArduinoOTA.handle();
+    // ArduinoOTA.handle();
 
     //Incoming Packet Handling
     while (!e131.isEmpty()) {
