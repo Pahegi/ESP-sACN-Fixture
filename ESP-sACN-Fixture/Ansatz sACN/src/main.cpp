@@ -7,7 +7,6 @@
 #include <WiFi.h>
 #endif
 
-#include <ArduinoOTA.h>
 #include <ESPAsyncE131.h>
 #include <ESPAsyncWiFiManager.h> //https://github.com/khoih-prog/ESPAsync_WiFiManager
 #include <ESPAsyncWebServer.h>
@@ -31,6 +30,7 @@ void saveConfigCallback () {
 #define HTTP_PORT 80
 AsyncWebServer webServer(HTTP_PORT);
 DNSServer dnsServer;
+AsyncWiFiManager wifiManager(&webServer,&dnsServer);
 
 
 /********************************
@@ -142,6 +142,35 @@ void readFile(const char * path) {
   file.close();
 }
 
+/********************************
+*
+*       Webserver Contents
+*
+********************************/
+String getHTML(){
+    return
+    "<!DOCTYPE html>\
+    <html>\
+    <style>\
+        html {font-family: Arial; display: inline-block; text-align: center}\
+    </style>\
+    <title>sACN Fixture</title>\
+    <body>\
+        <h1>sACN Fixture</h1>\
+        <p>Adresse: " + String(start_channel) + "</p>\
+        <p>Universum: " + String(start_universe) + "</p>\
+        <form action=\"/\">\
+        Adresse: <input type=\"text\" name=\"Adresse\"><br>\
+        Universum: <input type=\"text\" name=\"Universum\"><br>\
+        <input type=\"submit\" value=\"Speichern\">\
+        </form><br>\
+        <form action=\"/disconnect\">\
+        <input type=\"submit\" value=\"Verbindung trennen\">\
+        </form><br>\
+    </body>\
+    </html>";
+}
+
 
 
 /********************************
@@ -195,12 +224,12 @@ void setup() {
     Serial.println("Starting WiFi Manager...");
     AsyncWiFiManagerParameter custom_start_adress("DMX Startadresse", "DMX Startadresse", "", 3);
     AsyncWiFiManagerParameter custom_start_universe("Universum", "Universum", "", 3);
-    AsyncWiFiManager wifiManager(&webServer,&dnsServer);
     //set config save notify callback
     wifiManager.setSaveConfigCallback(saveConfigCallback);
     //add all parameter
     wifiManager.addParameter(&custom_start_adress);
     wifiManager.addParameter(&custom_start_universe);
+    wifiManager.setAPStaticIPConfig(IPAddress(192,168,0,1), IPAddress(192,168,0,1), IPAddress(255,255,255,0));
     wifiManager.autoConnect("DMX Fixture");
     Serial.println("Connected to Wifi");
     //store updated values if necessary
@@ -213,45 +242,41 @@ void setup() {
 
     /********************************
      *
-     *          OTA Setup
+     *       Webserver Listener
      *
      ********************************/
-    Serial.println("Starting OTA Setup...");
-    ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH)
-      type = "sketch";
-    else // U_SPIFFS
-      type = "filesystem";
-    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-        Serial.println("Start updating " + type);
+    webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+        String inputMessage1;
+        String inputMessage2;
+        const char* PARAM_INPUT_1 = "Adresse";
+        const char* PARAM_INPUT_2 = "Universum";   
+        // GET input1 value on <ESP_IP>/get?Adresse=<inputMessage1>&Universum=<inputMessage2>
+        if (request->hasParam(PARAM_INPUT_1) && request->hasParam(PARAM_INPUT_2)) {
+            inputMessage1 = request->getParam(PARAM_INPUT_1)->value();
+            inputMessage2 = request->getParam(PARAM_INPUT_2)->value();
+            start_channel = inputMessage1.toInt();
+            start_universe = inputMessage2.toInt();
+            saveConfig();
+        }
+        request->send(200, "text/html", getHTML());
     });
-    ArduinoOTA.onEnd([]() {
-        Serial.println("\nEnd");
+    webServer.on("/disconnect", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send(200, "text/html", "Verbindung wird getrennt...<br>Bitte über Accesspoint verbinden.");
+        delay(1000);
+        WiFi.disconnect();
+        delay(1000);
+        wifiManager.autoConnect("DMX Fixture");
+        Serial.println("Connected to Wifi");
     });
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    });
-    ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    });
-    ArduinoOTA.begin();
+    webServer.begin();
 
     /********************************
      *
      *    Config for sACN Library
      *
      ********************************/
-    // start_channel = 1;
-    // start_universe = 1;
-    // Choose one to begin listening for E1.31 data
-    if (e131.begin(E131_UNICAST))                               // Listen via Unicast
-    // if (e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT)) // Listen via Multicast
+    // if (e131.begin(E131_UNICAST))                               // Listen via Unicast
+    if (e131.begin(E131_MULTICAST, start_universe, UNIVERSE_COUNT)) // Listen via Multicast
         Serial.printf("Listening for E1.31 data on Universe %u starting at Channel %u...\n", start_universe, start_channel);
     else
         Serial.println(F("*** e131.begin failed ***"));
@@ -265,9 +290,6 @@ void setup() {
 *
 ********************************/
 void loop() {
-
-    //OTA Handling
-    // ArduinoOTA.handle();
 
     //Incoming Packet Handling
     while (!e131.isEmpty()) {
