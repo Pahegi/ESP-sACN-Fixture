@@ -53,6 +53,7 @@ const uint8_t ledPinW2 = 16;
 #define CHANNEL_COUNT 5 // Total number of Channels to listen for, starting at START_CHANNEL
 uint8_t start_channel = 1;
 uint8_t start_universe = 1;
+String fixture_name = "sACN Fixture";
 
 ESPAsyncE131 e131(UNIVERSE_COUNT);
 
@@ -90,11 +91,14 @@ bool loadConfig() {
     }
     start_channel = doc["start_channel"];
     start_universe = doc["start_universe"];
+    fixture_name = (const char*)doc["fixture_name"];
 
     Serial.print("Loaded start_channel: ");
     Serial.println(start_channel);
     Serial.print("Loaded start_universe: ");
     Serial.println(start_universe);
+    Serial.print("Loaded Fixture Name: ");
+    Serial.println(fixture_name);
     return true;
 }
 
@@ -108,6 +112,7 @@ bool saveConfig() {
     StaticJsonDocument<200> doc;
     doc["start_channel"] = start_channel;
     doc["start_universe"] = start_universe;
+    doc["fixture_name"] = fixture_name;
 
     File configFile = LittleFS.open("/config.json", "w");
     if (!configFile) {
@@ -156,12 +161,13 @@ String getHTML(){
     </style>\
     <title>sACN Fixture</title>\
     <body>\
-        <h1>sACN Fixture</h1>\
+        <h1>" + fixture_name + "</h1>\
         <p>Adresse: " + String(start_channel) + "</p>\
         <p>Universum: " + String(start_universe) + "</p>\
         <form action=\"/\">\
-        Adresse: <input type=\"text\" name=\"Adresse\"><br>\
-        Universum: <input type=\"text\" name=\"Universum\"><br>\
+        Name: <input type=\"text\" name=\"Name\" value=\"" + fixture_name + "\"><br>\
+        Adresse: <input type=\"text\" name=\"Adresse\" value=\"" + start_channel + "\"><br>\
+        Universum: <input type=\"text\" name=\"Universum\" value=\"" + start_universe + "\"><br>\
         <input type=\"submit\" value=\"Speichern\">\
         </form><br>\
         <form action=\"/disconnect\">\
@@ -248,14 +254,18 @@ void setup() {
     webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         String inputMessage1;
         String inputMessage2;
+        String inputMessage3;
         const char* PARAM_INPUT_1 = "Adresse";
         const char* PARAM_INPUT_2 = "Universum";   
+        const char* PARAM_INPUT_3 = "Name";   
         // GET input1 value on <ESP_IP>/get?Adresse=<inputMessage1>&Universum=<inputMessage2>
-        if (request->hasParam(PARAM_INPUT_1) && request->hasParam(PARAM_INPUT_2)) {
+        if (request->hasParam(PARAM_INPUT_1) && request->hasParam(PARAM_INPUT_2) && request->hasParam(PARAM_INPUT_3)) {
             inputMessage1 = request->getParam(PARAM_INPUT_1)->value();
             inputMessage2 = request->getParam(PARAM_INPUT_2)->value();
+            inputMessage3 = request->getParam(PARAM_INPUT_3)->value();
             start_channel = inputMessage1.toInt();
             start_universe = inputMessage2.toInt();
+            fixture_name = inputMessage3;
             saveConfig();
         }
         request->send(200, "text/html", getHTML());
